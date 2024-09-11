@@ -29,40 +29,29 @@ contract KittyBridge is KittyBridgeBase, CCIPReceiver, Ownable {
         gaslimit = 400000;
     }
 
-    /// @dev Updates the allowlist status of a destination chain for transactions.
     function allowlistDestinationChain(uint64 _destinationChainSelector, bool allowed) external onlyOwner {
         allowlistedDestinationChains[_destinationChainSelector] = allowed;
     }
 
-    /// @dev Updates the allowlist status of a source chain for transactions.
     function allowlistSourceChain(uint64 _sourceChainSelector, bool allowed) external onlyOwner {
         allowlistedSourceChains[_sourceChainSelector] = allowed;
     }
 
-    /// @dev Updates the allowlist status of a sender for transactions.
     function allowlistSender(address _sender, bool allowed) external onlyOwner {
         allowlistedSenders[_sender] = allowed;
     }
 
-    /// @notice Sends data to receiver on the destination chain.
-    /// @notice Pay for fees in LINK.
-    /// @param _destinationChainSelector The identifier (aka selector) for the destination blockchain.
-    /// @param _receiver The address of the recipient on the destination blockchain.
-    /// @param _data The payload data.
-    /// @return messageId The ID of the CCIP message that was sent.
+   
     function bridgeNftWithData(uint64 _destinationChainSelector, address _receiver, bytes memory _data)
         external
         onlyAllowlistedDestinationChain(_destinationChainSelector)
         validateReceiver(_receiver)
         returns (bytes32 messageId)
     {
-        // Create an EVM2AnyMessage struct in memory with necessary information for sending a cross-chain message
         Client.EVM2AnyMessage memory evm2AnyMessage = _buildCCIPMessage(_receiver, _data, address(s_linkToken));
 
-        // Initialize a router client instance to interact with cross-chain router
         IRouterClient router = IRouterClient(this.getRouter());
 
-        // Get the fee required to send the CCIP message
         uint256 fees = router.getFee(_destinationChainSelector, evm2AnyMessage);
 
         if (fees > s_linkToken.balanceOf(address(this))) {
@@ -76,7 +65,6 @@ contract KittyBridge is KittyBridgeBase, CCIPReceiver, Ownable {
         return messageId;
     }
 
-    /// handling a received message
     function _ccipReceive(Client.Any2EVMMessage memory any2EvmMessage)
         internal
         override
@@ -92,21 +80,15 @@ contract KittyBridge is KittyBridgeBase, CCIPReceiver, Ownable {
         );
     }
 
-    /// @notice Construct a CCIP message.
-    /// @param _receiver The address of the receiver.
-    /// @param _data The data to be sent.
-    /// @param _feeTokenAddress The address of the token used for fees. Set address(0) for native gas.
-    /// @return Client.EVM2AnyMessage Returns an EVM2AnyMessage struct which contains information for sending a CCIP message.
     function _buildCCIPMessage(address _receiver, bytes memory _data, address _feeTokenAddress)
         internal
         view
         returns (Client.EVM2AnyMessage memory)
     {
-        // Create an EVM2AnyMessage struct in memory with necessary information for sending a cross-chain message
         return Client.EVM2AnyMessage({
             receiver: abi.encode(_receiver), // ABI-encoded receiver address
             data: _data, // payload data
-            tokenAmounts: new Client.EVMTokenAmount[](0), // Empty array as no tokens are transferred
+            tokenAmounts: new Client.EVMTokenAmount[](0), 
             extraArgs: Client._argsToBytes(Client.EVMExtraArgsV1({gasLimit: gaslimit})),
             feeToken: _feeTokenAddress
         });
